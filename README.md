@@ -5,6 +5,8 @@
 This application allows you to draw playing cards from slack.
 You can enjoy drawing cards to avoid "3 Mitu".
 
+![compose](./img/slackExample.png)
+
 ### system configuration
 
 ![compose](./img/slackBot.png)
