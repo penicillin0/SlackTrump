@@ -160,7 +160,7 @@ def createAllTrump():
 
 
 def checkValidText(text):
-    validTextList = ['トランプ', 'delete']
+    validTextList = ['トランプ', 'delete', 'とらんぷ', 'Trump', 'trump']
     for validText in validTextList:
         if validText in text:
             return True
