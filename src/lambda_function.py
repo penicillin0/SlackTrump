@@ -5,6 +5,8 @@ import random
 import boto3
 import datetime
 
+TOTAL_TRUMP_NUM: int = 54
+
 
 def lambda_handler(event, context):
 
@@ -12,7 +14,7 @@ def lambda_handler(event, context):
     ### ここから各種検証 ###
 
     # リトライイベントなら終了
-    if reserchTimeoutOrNot(event):
+    if is_reserch_timeout(event):
         return {'statusCode': 200, 'body': json.dumps('retry')}
 
     body = json.loads(event['body'])
@@ -32,7 +34,7 @@ def lambda_handler(event, context):
     text = body['event']['text']
 
     # 有効なテキストが入っていないなら終了
-    if not checkValidText(text):
+    if not is_valid_text(text):
         return {'statusCode': 200, 'body': json.dumps('valid text')}
 
     ### ここまで各種検証 ###
@@ -56,10 +58,10 @@ def lambda_handler(event, context):
         trumpinfo = []
 
     # 重複を削除
-    trumpinfo_wo_daburi, drawn_trump_set = resolveOverlap(trumpinfo)
+    trumpinfo_wo_daburi, drawn_trump_set = resolve_overlap(trumpinfo)
 
     # トランプ全部
-    all_trump = createAllTrump()
+    all_trump = create_all_trump()
 
     # トランプを引く
     all_trump_set = set(all_trump)
@@ -73,8 +75,8 @@ def lambda_handler(event, context):
 
     # 引いたトランプを加える
     trumpinfo_wo_daburi.append({'S': draw_trump})
-    drawnTrumpNum = len(trumpinfo_wo_daburi)
-    remainTrumpNum = 54 - len(trumpinfo_wo_daburi)
+    drawn_trump_num = len(trumpinfo_wo_daburi)
+    remain_trump_num = TOTAL_TRUMP_NUM - len(trumpinfo_wo_daburi)
 
     append_item = {
         "date": {
@@ -97,8 +99,8 @@ def lambda_handler(event, context):
             "{:8}".format('|'+userName+'さん')+'|'+'\n' +
             "{:11}".format('|')+rep+'|\n' +
             "ーーーーー\n\n"
-            ':トランプ:の残り枚数:'+str(remainTrumpNum)+'\n\n\n\n' +
-            '引かれた:トランプ:の枚数:'+str(drawnTrumpNum)+'\n\n' +
+            ':トランプ:の残り枚数:'+str(remain_trump_num)+'\n\n\n\n' +
+            '引かれた:トランプ:の枚数:'+str(drawn_trump_num)+'\n\n' +
             '引かれた:black_joker:の枚数:'+str(2 - joker_num_nokori)+'\n\n'
         )
         # 'DB確認用(後で消す)'+'\n'+
@@ -140,7 +142,7 @@ def format_DB(d_today, client):
     post_message_to_channel(str(d_today)+"のDBをクリアしました")
 
 
-def reserchTimeoutOrNot(event):
+def is_reserch_timeout(event):
     if 'x-slack-retry-reason' in event['headers']:
         if event['headers']['x-slack-retry-reason'] in ['http_error', 'http_timeout']:
             # 確認用
@@ -149,7 +151,7 @@ def reserchTimeoutOrNot(event):
     return False
 
 
-def createAllTrump():
+def create_all_trump():
     all_trump = []
     for i in range(1, 14):
         for kigou in ['d', 's', 'h', 'k']:
@@ -159,7 +161,7 @@ def createAllTrump():
     return all_trump
 
 
-def checkValidText(text):
+def is_valid_text(text):
     validTextList = ['トランプ', 'delete', 'とらんぷ', 'Trump', 'trump']
     for validText in validTextList:
         if validText in text:
@@ -167,7 +169,7 @@ def checkValidText(text):
     return False
 
 
-def resolveOverlap(trumpinfo):
+def resolve_overlap(trumpinfo):
     # trumpinfo -> trumpinfo_wo_dauri
     drawn_trump_list = []
     trumpinfo_wo_daburi = []
