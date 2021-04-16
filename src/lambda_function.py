@@ -138,7 +138,7 @@ def lambda_handler(event, context):
 def get_draw_num(text: str) -> int:
     """text内に含まれる数字を抽出して返す
     """    
-    if re.compile("^(?=.*Multiple)(?=\d).*$").match(text):
+    if re.compile("^(?=.*Multiple)(?=.*\d).*$").match(text):
         num_of_draws = re.search(r'\d+', text).group()
     else:
         num_of_draws = 1
