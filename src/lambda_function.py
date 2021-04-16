@@ -4,6 +4,7 @@ import urllib.request
 import random
 import boto3
 import datetime
+import re
 
 TOTAL_TRUMP_NUM: int = 54
 
@@ -52,60 +53,94 @@ def lambda_handler(event, context):
         format_DB(d_today, client)
         return {'statusCode': 200, 'body': json.dumps('delete')}
 
-    if "Item" in item.keys():
-        trumpinfo = item['Item']['trump']["L"]
-    else:
-        trumpinfo = []
+    # トランプを含む投稿なのか？
+    if re.compile("^(?=.*(トランプ|とらんぷ|Trump|trump)).*$").match(text):
+        # Multipleを含む、かつ、数字を含むのか？
+        if re.compile("^(?=.*Multiple)(?=\d).*$"):
+            num_of_draws = re.search(r'\d+', text).group()
+        else:
+            num_of_draws = 1
 
-    # 重複を削除
-    trumpinfo_wo_daburi, drawn_trump_set = resolve_overlap(trumpinfo)
+        if "Item" in item.keys():
+            trumpinfo = item['Item']['trump']["L"]
+        else:
+            trumpinfo = []
+            
+        # 重複を削除
+        trumpinfo_wo_daburi, drawn_trump_set = resolve_overlap(trumpinfo)
 
-    # トランプ全部
-    all_trump = create_all_trump()
+        # トランプ全部
+        all_trump = create_all_trump()
 
-    # トランプを引く
-    all_trump_set = set(all_trump)
-    able_draw_list = list(all_trump_set - drawn_trump_set)
-    draw_trump = random.choice(able_draw_list)
+        # トランプを引く
+        all_trump_set = set(all_trump)
+        able_draw_list = list(all_trump_set - drawn_trump_set)
+        draw_trump = random.sample(able_draw_list, num_of_draws)
 
-    # jokerの枚数をチェック
-    joker_num_nokori = get_joker_num(able_draw_list)
-    if draw_trump == 'j1' or draw_trump == 'j2':
-        joker_num_nokori -= 1
+        # jokerの枚数をチェック
+        joker_num_nokori = get_joker_num(able_draw_list)
+        for trump in draw_trump:
+            if trump == "j1" or trump == "j2":
+                joker_num_nokori -= 1
+        # if draw_trump == 'j1' or draw_trump == 'j2':
+        #     joker_num_nokori -= 1
 
-    # 引いたトランプを加える
-    trumpinfo_wo_daburi.append({'S': draw_trump})
-    drawn_trump_num = len(trumpinfo_wo_daburi)
-    remain_trump_num = TOTAL_TRUMP_NUM - len(trumpinfo_wo_daburi)
+        # 引いたトランプを加える
+        for trump in draw_trump:
+            trumpinfo_wo_daburi.append({'S' : trump})
+        # trumpinfo_wo_daburi.append({'S': draw_trump})
+        drawn_trump_num = len(trumpinfo_wo_daburi)
+        remain_trump_num = TOTAL_TRUMP_NUM - len(trumpinfo_wo_daburi)
 
-    append_item = {
-        "date": {
-            "S": d_today
-        },
-        "trump": {
-            "L": trumpinfo_wo_daburi
+        append_item = {
+            "date": {
+                "S": d_today
+            },
+            "trump": {
+                "L": trumpinfo_wo_daburi
+            }
         }
-    }
 
-    client.put_item(TableName='TrumpHistory', Item=append_item)
+        client.put_item(TableName='TrumpHistory', Item=append_item)
 
-    if ('トランプ' in text) or ('とらんぷ' in text) or ('Trump' in text) or ('trump' in text):
-        rep = draw_trump.replace('d', '♦').replace('h', '♥').replace(
-            'k', '♣').replace('s', '♠').replace('j', ':black_joker:')
-
-        post_message_to_channel(
-            "ーーーーー\n" +
-            "{:13}".format('|'+rep)+'|\n' +
-            "{:8}".format('|'+userName+'さん')+'|'+'\n' +
-            "{:11}".format('|')+rep+'|\n' +
-            "ーーーーー\n\n"
-            ':トランプ:の残り枚数:'+str(remain_trump_num)+'\n\n\n\n' +
-            '引かれた:トランプ:の枚数:'+str(drawn_trump_num)+'\n\n' +
-            '引かれた:black_joker:の枚数:'+str(2 - joker_num_nokori)+'\n\n'
-        )
-        # 'DB確認用(後で消す)'+'\n'+
-        # '------------------'+'\n'+
-        # json.dumps(append_item))
+        if num_of_draws == 1:
+            rep = draw_trump[0].replace('d', '♦').replace('h', '♥').replace(
+                'k', '♣').replace('s', '♠').replace('j', ':black_joker:')
+            post_message_to_channel(
+                "ーーーーー\n" +
+                "{:13}".format('|'+rep)+'|\n' +
+                "{:8}".format('|'+userName+'さん')+'|'+'\n' +
+                "{:11}".format('|')+rep+'|\n' +
+                "ーーーーー\n\n"
+                ':トランプ:の残り枚数:'+str(remain_trump_num)+'\n\n\n\n' +
+                '引かれた:トランプ:の枚数:'+str(drawn_trump_num)+'\n\n' +
+                '引かれた:black_joker:の枚数:'+str(2 - joker_num_nokori)+'\n\n'
+            )
+            # 'DB確認用(後で消す)'+'\n'+
+            # '------------------'+'\n'+
+            # json.dumps(append_item))
+        else:
+            reps = list(map(lambda x : x.replace('d', '♦').replace('h', '♥').replace(
+                'k', '♣').replace('s', '♠').replace('j', ':black_joker:'), draw_trump))
+            max_num = 0
+            min_num = 15
+            joker_num = 0
+            post_msg = "----------\n"
+            for rep in reps:
+                post_msg += "{}".format(rep) + "\n"
+                rep_num = int(re.search(r'\d+', rep).group())
+                max_num = max(max_num, rep_num)
+                min_num = min(min_num, rep_num)
+                if "black_joker" in rep:
+                    joker_num += 1
+            post_msg += "----------\n\n"
+            post_msg += "最大値: {}\n\n".format(max_num)
+            post_msg += "最小値: {}\n\n".format(min_num)
+            post_msg += "引いたジョーカーの数: {}\n\n".format(joker_num)
+            post_msg += ":トランプ:の残り枚数: {}\n\n\n\n".format(remain_trump_num)
+            post_msg += "引かれた:トランプ:の枚数: {}\n\n".format(drawn_trump_num)
+            post_msg += "引かれた:black_joker:の枚数: {}\n\n".format(2 - joker_num_nokori)
+            post_message_to_channel(post_msg)
 
     return {'statusCode': 200, 'body': json.dumps('ok')}
 
