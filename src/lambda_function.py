@@ -139,7 +139,7 @@ def get_draw_num(text: str) -> int:
     """text内に含まれる数字を抽出して返す
     """    
     if re.compile("^(?=.*Multiple)(?=.*\d).*$").match(text):
-        num_of_draws = re.search(r'\d+', text).group()
+        num_of_draws = int(re.search(r'\d+', text).group())
     else:
         num_of_draws = 1
     return num_of_draws
