@@ -4,6 +4,7 @@ import urllib.request
 import random
 import boto3
 import datetime
+import re
 
 TOTAL_TRUMP_NUM: int = 54
 
@@ -34,7 +35,7 @@ def lambda_handler(event, context):
     text = body['event']['text']
 
     # 有効なテキストが入っていないなら終了
-    if not is_valid_text(text):
+    if re.compile("^(?!.*(トランプ|とらんぷ|Trump|trump|delete)).*$").match(text):
         return {'statusCode': 200, 'body': json.dumps('valid text')}
 
     ### ここまで各種検証 ###
@@ -52,6 +53,8 @@ def lambda_handler(event, context):
         format_DB(d_today, client)
         return {'statusCode': 200, 'body': json.dumps('delete')}
 
+    num_of_draws = get_draw_num(text)
+
     if "Item" in item.keys():
         trumpinfo = item['Item']['trump']["L"]
     else:
@@ -66,15 +69,17 @@ def lambda_handler(event, context):
     # トランプを引く
     all_trump_set = set(all_trump)
     able_draw_list = list(all_trump_set - drawn_trump_set)
-    draw_trump = random.choice(able_draw_list)
+    draw_trump = random.sample(able_draw_list, num_of_draws)
 
     # jokerの枚数をチェック
     joker_num_nokori = get_joker_num(able_draw_list)
-    if draw_trump == 'j1' or draw_trump == 'j2':
-        joker_num_nokori -= 1
+    for trump in draw_trump:
+        if trump == "j1" or trump == "j2":
+            joker_num_nokori -= 1
 
     # 引いたトランプを加える
-    trumpinfo_wo_daburi.append({'S': draw_trump})
+    for trump in draw_trump:
+        trumpinfo_wo_daburi.append({'S' : trump})
     drawn_trump_num = len(trumpinfo_wo_daburi)
     remain_trump_num = TOTAL_TRUMP_NUM - len(trumpinfo_wo_daburi)
 
@@ -89,10 +94,9 @@ def lambda_handler(event, context):
 
     client.put_item(TableName='TrumpHistory', Item=append_item)
 
-    if ('トランプ' in text) or ('とらんぷ' in text) or ('Trump' in text) or ('trump' in text):
-        rep = draw_trump.replace('d', '♦').replace('h', '♥').replace(
+    if num_of_draws == 1:
+        rep = draw_trump[0].replace('d', '♦').replace('h', '♥').replace(
             'k', '♣').replace('s', '♠').replace('j', ':black_joker:')
-
         post_message_to_channel(
             "ーーーーー\n" +
             "{:13}".format('|'+rep)+'|\n' +
@@ -106,9 +110,40 @@ def lambda_handler(event, context):
         # 'DB確認用(後で消す)'+'\n'+
         # '------------------'+'\n'+
         # json.dumps(append_item))
+    else:
+        reps = list(map(lambda x : x.replace('d', '♦').replace('h', '♥').replace(
+            'k', '♣').replace('s', '♠').replace('j', ':black_joker:'), draw_trump))
+        max_num = 0
+        min_num = 15
+        joker_num = 0
+        post_msg = "----------\n"
+        post_msg += "{}さん\n\n".format(userName)
+        for rep in reps:
+            post_msg += "{}".format(rep) + "\n"
+            rep_num = int(re.search(r'\d+', rep).group())
+            max_num = max(max_num, rep_num)
+            min_num = min(min_num, rep_num)
+            if "black_joker" in rep:
+                joker_num += 1
+        post_msg += "----------\n\n"
+        post_msg += "最大値: {}\n\n".format(max_num)
+        post_msg += "最小値: {}\n\n".format(min_num)
+        post_msg += "引いたジョーカーの数: {}\n\n".format(joker_num)
+        post_msg += ":トランプ:の残り枚数: {}\n\n\n\n".format(remain_trump_num)
+        post_msg += "引かれた:トランプ:の枚数: {}\n\n".format(drawn_trump_num)
+        post_msg += "引かれた:black_joker:の枚数: {}\n\n".format(2 - joker_num_nokori)
+        post_message_to_channel(post_msg)
 
     return {'statusCode': 200, 'body': json.dumps('ok')}
 
+def get_draw_num(text: str) -> int:
+    """text内に含まれる数字を抽出して返す
+    """    
+    if re.compile("^(?=.*Multiple)(?=.*\d).*$").match(text):
+        num_of_draws = int(re.search(r'\d+', text).group())
+    else:
+        num_of_draws = 1
+    return num_of_draws
 
 def get_joker_num(trump_list):
     joker_num = 0
@@ -159,15 +194,6 @@ def create_all_trump():
     all_trump.append('j1')
     all_trump.append('j2')
     return all_trump
-
-
-def is_valid_text(text):
-    validTextList = ['トランプ', 'delete', 'とらんぷ', 'Trump', 'trump']
-    for validText in validTextList:
-        if validText in text:
-            return True
-    return False
-
 
 def resolve_overlap(trumpinfo):
     # trumpinfo -> trumpinfo_wo_dauri
