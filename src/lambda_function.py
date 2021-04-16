@@ -117,6 +117,7 @@ def lambda_handler(event, context):
         min_num = 15
         joker_num = 0
         post_msg = "----------\n"
+        post_msg += "{}さん".format(userName)
         for rep in reps:
             post_msg += "{}".format(rep) + "\n"
             rep_num = int(re.search(r'\d+', rep).group())
