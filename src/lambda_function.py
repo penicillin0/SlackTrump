@@ -35,7 +35,7 @@ def lambda_handler(event, context):
     text = body['event']['text']
 
     # 有効なテキストが入っていないなら終了
-    if re.compile("^(?!.*(トランプ|とらんぷ|Trump|trump|delete).*$").match(text):
+    if re.compile("^(?!.*(トランプ|とらんぷ|Trump|trump|delete)).*$").match(text):
         return {'statusCode': 200, 'body': json.dumps('valid text')}
 
     ### ここまで各種検証 ###
@@ -59,7 +59,7 @@ def lambda_handler(event, context):
         trumpinfo = item['Item']['trump']["L"]
     else:
         trumpinfo = []
-        
+
     # 重複を削除
     trumpinfo_wo_daburi, drawn_trump_set = resolve_overlap(trumpinfo)
 
