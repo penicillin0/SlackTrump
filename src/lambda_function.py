@@ -35,7 +35,7 @@ def lambda_handler(event, context):
     text = body['event']['text']
 
     # 有効なテキストが入っていないなら終了
-    if re.compile("^(?!.*(トランプ|とらんぷ|Trump|trump|delete)).*$").match(text):
+    if re.compile("^(?!.*(トランプ|とらんぷ|Trump|trump|delete)).*$", flags=re.DOTALL).match(text):
         return {'statusCode': 200, 'body': json.dumps('valid text')}
 
     ### ここまで各種検証 ###
@@ -79,7 +79,7 @@ def lambda_handler(event, context):
 
     # 引いたトランプを加える
     for trump in draw_trump:
-        trumpinfo_wo_daburi.append({'S' : trump})
+        trumpinfo_wo_daburi.append({'S': trump})
     drawn_trump_num = len(trumpinfo_wo_daburi)
     remain_trump_num = TOTAL_TRUMP_NUM - len(trumpinfo_wo_daburi)
 
@@ -111,7 +111,7 @@ def lambda_handler(event, context):
         # '------------------'+'\n'+
         # json.dumps(append_item))
     else:
-        reps = list(map(lambda x : x.replace('d', '♦').replace('h', '♥').replace(
+        reps = list(map(lambda x: x.replace('d', '♦').replace('h', '♥').replace(
             'k', '♣').replace('s', '♠').replace('j', ':black_joker:'), draw_trump))
         max_num = 0
         min_num = 15
@@ -136,14 +136,16 @@ def lambda_handler(event, context):
 
     return {'statusCode': 200, 'body': json.dumps('ok')}
 
+
 def get_draw_num(text: str) -> int:
     """text内に含まれる数字を抽出して返す
-    """    
+    """
     if re.compile("^(?=.*Multiple)(?=.*\d).*$").match(text):
         num_of_draws = int(re.search(r'\d+', text).group())
     else:
         num_of_draws = 1
     return num_of_draws
+
 
 def get_joker_num(trump_list):
     joker_num = 0
@@ -194,6 +196,7 @@ def create_all_trump():
     all_trump.append('j1')
     all_trump.append('j2')
     return all_trump
+
 
 def resolve_overlap(trumpinfo):
     # trumpinfo -> trumpinfo_wo_dauri
