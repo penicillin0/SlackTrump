@@ -35,7 +35,7 @@ def lambda_handler(event, context):
     text = body['event']['text']
 
     # 有効なテキストが入っていないなら終了
-    if re.compile("^(?!.*(トランプ|とらんぷ|Trump|trump|delete)).*$", flags=(re.DOTALL)).match(text):
+    if re.compile("^(?!.*(トランプ|とらんぷ|Trump|trump|delete)).*$", flags=re.DOTALL).match(text):
         return {'statusCode': 200, 'body': json.dumps('valid text')}
 
     ### ここまで各種検証 ###
